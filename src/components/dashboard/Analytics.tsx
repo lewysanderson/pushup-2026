@@ -32,8 +32,8 @@ export function Analytics() {
 
     try {
       // Fetch all logs for 2026
-      const { data: logs, error } = await supabase
-        .from('logs')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: logs, error } = await (supabase.from('logs') as any)
         .select('date, count, sets_breakdown')
         .eq('user_id', profile.id)
         .gte('date', '2026-01-01')

@@ -77,13 +77,13 @@ export function Logger() {
       // Optimistic update
       setTodayCount(newTotal);
 
-      const { error } = await supabase
-        .from('logs')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.from('logs') as any)
         .upsert({
           user_id: profile.id,
           date: today,
           count: newTotal,
-          sets_breakdown: setsBreakdown ? JSON.stringify(setsBreakdown) : null,
+          sets_breakdown: setsBreakdown || null,
         }, {
           onConflict: 'user_id,date',
         });

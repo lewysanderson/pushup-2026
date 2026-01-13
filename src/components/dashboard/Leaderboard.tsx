@@ -38,8 +38,8 @@ export function Leaderboard() {
       // Get total reps for each user
       const leaderboardData = await Promise.all(
         profiles.map(async (p) => {
-          const { data: logs } = await supabase
-            .from('logs')
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: logs } = await (supabase.from('logs') as any)
             .select('count, date')
             .eq('user_id', p.id)
             .gte('date', '2026-01-01')
@@ -85,8 +85,8 @@ export function Leaderboard() {
 
       const userIds = profiles.map((p) => p.id);
 
-      const { data: logs } = await supabase
-        .from('logs')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: logs } = await (supabase.from('logs') as any)
         .select('count')
         .in('user_id', userIds)
         .gte('date', '2026-01-01')
