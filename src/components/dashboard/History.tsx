@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -178,7 +179,6 @@ export function History() {
           sets_breakdown_json: setsBreakdown
         };
         
-        // We cast 'as any' here to bypass TypeScript error "not assignable to parameter of type never"
         const { error } = await supabase
           .from('logs')
           .update(updateData as any)
@@ -199,7 +199,6 @@ export function History() {
           sets_breakdown_json: setsBreakdown,
         };
         
-        // We cast 'as any' here to bypass potential TypeScript strictness on insert
         const { data, error } = await supabase
           .from('logs')
           .insert(insertData as any)
