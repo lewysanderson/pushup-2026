@@ -48,19 +48,21 @@ export function Analytics() {
 
       if (error) throw error;
 
-      if (!logs || logs.length === 0) {
+      const validLogs = logs || [];
+
+      if (validLogs.length === 0) {
         setIsLoading(false);
         return;
       }
 
       // Calculate stats
-      const total = logs.reduce((sum, log) => sum + log.count, 0);
-      const max = Math.max(...logs.map((log) => log.count));
-      const daysLogged = logs.length;
+      const total = validLogs.reduce((sum, log) => sum + log.count, 0);
+      const max = Math.max(...validLogs.map((log) => log.count));
+      const daysLogged = validLogs.length;
 
       // Calculate max set (largest single set)
       let maxSet = 0;
-      logs.forEach(log => {
+      validLogs.forEach(log => {
         if (log.sets_breakdown) {
           try {
             const breakdown = typeof log.sets_breakdown === 'string'
@@ -80,7 +82,7 @@ export function Analytics() {
       });
 
       // Prepare chart data (last 30 days or all data)
-      const chartData = logs.slice(-30).map((log) => ({
+      const chartData = validLogs.slice(-30).map((log) => ({
         date: new Date(log.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         count: log.count,
       }));
