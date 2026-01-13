@@ -77,8 +77,10 @@ export function Logger() {
       // Optimistic update
       setTodayCount(newTotal);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('logs') as any)
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      const { error } = await supabase
+        .from('logs')
         .upsert({
           user_id: profile.id,
           date: today,

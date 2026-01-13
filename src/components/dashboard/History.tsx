@@ -176,8 +176,10 @@ export function History() {
           count: total,
           sets_breakdown: setsBreakdown
         };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (supabase.from('logs') as any)
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        const { error } = await supabase
+          .from('logs')
           .update(updateData)
           .eq('id', editingLog.id);
 
@@ -195,8 +197,10 @@ export function History() {
           count: total,
           sets_breakdown: setsBreakdown,
         };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data, error } = await (supabase.from('logs') as any)
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        const { data, error } = await supabase
+          .from('logs')
           .insert(insertData)
           .select()
           .single();
