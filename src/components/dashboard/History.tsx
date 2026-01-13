@@ -148,7 +148,7 @@ export function History() {
 
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      let setsBreakdown = null;
+      let setsBreakdown: number[] | null = null;
 
       if (showAdvanced && sets.length > 0) {
         // Save as array of numbers [50, 20, 40]
@@ -172,12 +172,13 @@ export function History() {
         setLogs(logs.filter(log => log.id !== editingLog.id));
       } else if (editingLog) {
         // Update existing
+        const updateData: Record<string, unknown> = {
+          count: total,
+          sets_breakdown: setsBreakdown
+        };
         const { error } = await supabase
           .from('logs')
-          .update({
-            count: total,
-            sets_breakdown: setsBreakdown
-          })
+          .update(updateData)
           .eq('id', editingLog.id);
 
         if (error) throw error;
@@ -188,14 +189,15 @@ export function History() {
         } : log));
       } else {
         // Insert new
+        const insertData: Record<string, unknown> = {
+          user_id: profile.id,
+          date: dateStr,
+          count: total,
+          sets_breakdown: setsBreakdown,
+        };
         const { data, error } = await supabase
           .from('logs')
-          .insert({
-            user_id: profile.id,
-            date: dateStr,
-            count: total,
-            sets_breakdown: setsBreakdown,
-          })
+          .insert(insertData)
           .select()
           .single();
 

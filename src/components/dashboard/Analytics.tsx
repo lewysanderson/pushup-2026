@@ -8,7 +8,7 @@ import { TrendingUp, Target, Zap, Calendar, Award } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useUser } from "@/lib/context/UserContext";
 import { formatNumber } from "@/lib/utils";
-import type { DailyStats } from "@/types";
+import type { DailyStats, Log } from "@/types";
 
 export function Analytics() {
   const { profile } = useUser();
@@ -48,7 +48,7 @@ export function Analytics() {
 
       if (error) throw error;
 
-      const validLogs = logs || [];
+      const validLogs: Array<Pick<Log, 'date' | 'count' | 'sets_breakdown'>> = logs || [];
 
       if (validLogs.length === 0) {
         setIsLoading(false);
