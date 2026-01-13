@@ -37,12 +37,6 @@ export function History() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [sets, setSets] = useState<SetEntry[]>([{ id: '1', reps: '' }]);
 
-  useEffect(() => {
-    if (profile) {
-      loadMonthLogs();
-    }
-  }, [profile, currentMonth]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const loadMonthLogs = useCallback(async () => {
     if (!profile) return;
 

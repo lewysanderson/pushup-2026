@@ -27,12 +27,6 @@ export function Analytics() {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (profile) {
-      loadAnalytics();
-    }
-  }, [profile]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const loadAnalytics = useCallback(async () => {
     if (!profile) return;
 
