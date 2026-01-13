@@ -77,11 +77,13 @@ export function History() {
       setCount(existingLog.count.toString());
 
       // Parse existing sets breakdown if available
-      if (existingLog.sets_breakdown) {
+      const breakdownData = (existingLog as any).sets_breakdown_json || existingLog.sets_breakdown;
+
+      if (breakdownData) {
         try {
-          const breakdown = typeof existingLog.sets_breakdown === 'string'
-            ? JSON.parse(existingLog.sets_breakdown)
-            : existingLog.sets_breakdown;
+          const breakdown = typeof breakdownData === 'string'
+            ? JSON.parse(breakdownData)
+            : breakdownData;
 
           if (Array.isArray(breakdown) && breakdown.length > 0) {
             setSets(breakdown.map((reps: number, idx: number) => ({
@@ -151,7 +153,6 @@ export function History() {
       let setsBreakdown: number[] | null = null;
 
       if (showAdvanced && sets.length > 0) {
-        // Save as array of numbers [50, 20, 40]
         const validSets = sets
           .map(set => parseInt(set.reps))
           .filter(reps => !isNaN(reps) && reps > 0);
@@ -172,24 +173,22 @@ export function History() {
         setLogs(logs.filter(log => log.id !== editingLog.id));
       } else if (editingLog) {
         // Update existing
-        // FIXED: Used actual variables 'total' and 'setsBreakdown'
         const updateData = {
           count: total,
-          sets_breakdown_json: setsBreakdown 
+          sets_breakdown_json: setsBreakdown
         };
         
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
+        // We cast 'as any' here to bypass TypeScript error "not assignable to parameter of type never"
         const { error } = await supabase
           .from('logs')
-          .update(updateData)
+          .update(updateData as any)
           .eq('id', editingLog.id);
 
         if (error) throw error;
         setLogs(logs.map(log => log.id === editingLog.id ? {
           ...log,
           count: total,
-          sets_breakdown: setsBreakdown // Keep local state consistent
+          sets_breakdown: setsBreakdown
         } : log));
       } else {
         // Insert new
@@ -197,20 +196,17 @@ export function History() {
           user_id: profile.id,
           date: dateStr,
           count: total,
-          // FIXED: Changed to sets_breakdown_json to match the database column
-          sets_breakdown_json: setsBreakdown, 
+          sets_breakdown_json: setsBreakdown,
         };
         
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
+        // We cast 'as any' here to bypass potential TypeScript strictness on insert
         const { data, error } = await supabase
           .from('logs')
-          .insert(insertData)
+          .insert(insertData as any)
           .select()
           .single();
 
         if (error) throw error;
-        // Fix the local state object to match what UI expects (sets_breakdown)
         const newLog = { ...data, sets_breakdown: setsBreakdown };
         setLogs([newLog, ...logs].sort((a, b) => b.date.localeCompare(a.date)));
       }
@@ -308,13 +304,11 @@ export function History() {
         animate={{ opacity: 1 }}
         className="p-6 space-y-6 pb-24"
       >
-        {/* Header */}
         <div className="text-center space-y-2">
           <h2 className="text-3xl font-bold">History</h2>
           <p className="text-muted-foreground">View and edit your pushup logs</p>
         </div>
 
-        {/* Month Navigator */}
         <Card className="glass border-none">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -338,7 +332,6 @@ export function History() {
           </CardContent>
         </Card>
 
-        {/* Days List */}
         {isLoading ? (
           <div className="text-center py-8 text-muted-foreground">
             Loading...
@@ -348,7 +341,11 @@ export function History() {
             {getDaysInMonth().reverse().map((date) => {
               const log = getLogForDate(date);
               const isCurrent = isToday(date);
-              const setsInfo = log ? formatSetsBreakdown(log.sets_breakdown) : null;
+              
+              const breakdownSource = log 
+                ? ((log as any).sets_breakdown_json || log.sets_breakdown) 
+                : null;
+              const setsInfo = formatSetsBreakdown(breakdownSource);
 
               return (
                 <motion.div
@@ -400,7 +397,6 @@ export function History() {
         )}
       </motion.div>
 
-      {/* Edit Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -490,7 +486,6 @@ export function History() {
               </div>
             )}
 
-            {/* Toggle Advanced */}
             <Button
               variant="ghost"
               size="sm"
