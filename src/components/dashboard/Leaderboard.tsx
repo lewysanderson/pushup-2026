@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -11,6 +12,15 @@ import { useUser } from "@/lib/context/UserContext";
 import { formatNumber, calculatePercentage } from "@/lib/utils";
 import type { LeaderboardEntry, GroupStats } from "@/types";
 
+// Explicitly define what a Profile looks like to prevent "never" errors
+interface Profile {
+  id: string;
+  username: string;
+  avatar_url: string;
+  daily_target: number;
+  group_id: string;
+}
+
 export function Leaderboard() {
   const { profile, group } = useUser();
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -23,12 +33,15 @@ export function Leaderboard() {
 
     try {
       // Get all profiles in the group
-      const { data: profiles, error: profilesError } = await supabase
+      const { data, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
         .eq('group_id', group.id);
 
       if (profilesError) throw profilesError;
+
+      // Cast the data to our Profile type
+      const profiles = data as Profile[] | null;
 
       if (!profiles || profiles.length === 0) {
         setIsLoading(false);
@@ -38,16 +51,15 @@ export function Leaderboard() {
       // Get total reps for each user
       const leaderboardData = await Promise.all(
         profiles.map(async (p) => {
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore
-          const { data: logs } = await supabase
-            .from('logs')
+          // We use (supabase.from('logs') as any) to ensure the chain doesn't break
+          // if types are missing for the logs table
+          const { data: logs } = await (supabase.from('logs') as any)
             .select('count, date')
             .eq('user_id', p.id)
             .gte('date', '2026-01-01')
             .lte('date', '2026-12-31');
 
-          const totalReps = logs?.reduce((sum, log) => sum + log.count, 0) || 0;
+          const totalReps = (logs || []).reduce((sum: number, log: any) => sum + (log.count || 0), 0);
 
           // Calculate streak
           const { data: streakData } = await supabase
@@ -78,25 +90,24 @@ export function Leaderboard() {
     if (!group) return;
 
     try {
-      const { data: profiles } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('id')
         .eq('group_id', group.id);
+      
+      const profiles = data as { id: string }[] | null;
 
       if (!profiles) return;
 
       const userIds = profiles.map((p) => p.id);
 
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      const { data: logs } = await supabase
-        .from('logs')
+      const { data: logs } = await (supabase.from('logs') as any)
         .select('count')
         .in('user_id', userIds)
         .gte('date', '2026-01-01')
         .lte('date', '2026-12-31');
 
-      const totalReps = logs?.reduce((sum, log) => sum + log.count, 0) || 0;
+      const totalReps = (logs || []).reduce((sum: number, log: any) => sum + (log.count || 0), 0);
 
       setGroupStats({
         total_reps: totalReps,
