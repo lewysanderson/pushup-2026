@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@/lib/context/UserContext";
 import { supabase } from "@/lib/supabase";
-import { Copy, Check, Target, Users, Code } from "lucide-react";
+import { Copy, Check, Target, Users, Code, LogOut } from "lucide-react";
 
 export function Settings() {
   const { profile, group, setProfile, logout } = useUser();
@@ -49,6 +49,31 @@ export function Settings() {
       console.error('Error updating target:', error);
       alert("Failed to update target. Please try again.");
     } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!profile) return;
+
+    if (!confirm("Are you sure you want to leave this group?")) {
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ group_id: null })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      window.location.reload();
+    } catch (error) {
+      console.error('Error leaving group:', error);
+      alert("Failed to leave group. Please try again.");
       setIsSaving(false);
     }
   };
@@ -204,6 +229,35 @@ export function Settings() {
                 Year goal at current target: {(profile.daily_target * 365).toLocaleString()} pushups
               </p>
             </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Danger Zone */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+      >
+        <Card className="glass border-red-500/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-500">
+              <LogOut className="h-5 w-5" />
+              Danger Zone
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Leaving the group will remove you from the leaderboard. Your pushup history will be saved.
+            </p>
+            <Button
+              variant="destructive"
+              className="w-full"
+              onClick={handleLeaveGroup}
+              disabled={isSaving}
+            >
+              {isSaving ? "Leaving..." : "Leave Group"}
+            </Button>
           </CardContent>
         </Card>
       </motion.div>
