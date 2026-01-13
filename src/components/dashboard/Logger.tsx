@@ -74,18 +74,23 @@ export function Logger() {
       const today = getTodayString();
       const newTotal = todayCount + count;
 
+      // Convert {sets, reps} to [reps, reps, reps] for consistency with other components
+      // and to satisfy the Json type definition (arrays are valid Json, custom objects need index signature)
+      let setsBreakdownJson: number[] | null = null;
+      if (setsBreakdown && setsBreakdown.sets > 0) {
+        setsBreakdownJson = Array(setsBreakdown.sets).fill(setsBreakdown.reps);
+      }
+
       // Optimistic update
       setTodayCount(newTotal);
 
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
       const { error } = await supabase
         .from('logs')
         .upsert({
           user_id: profile.id,
           date: today,
           count: newTotal,
-          sets_breakdown: setsBreakdown || null,
+          sets_breakdown: setsBreakdownJson,
         }, {
           onConflict: 'user_id,date',
         });

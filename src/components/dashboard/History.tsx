@@ -28,7 +28,7 @@ interface Log {
   user_id: string;
   date: string;
   count: number;
-  sets_breakdown_json: number[] | null;
+  sets_breakdown: number[] | null;
   created_at?: string;
 }
 
@@ -36,12 +36,12 @@ interface LogInsert {
   user_id: string;
   date: string;
   count: number;
-  sets_breakdown_json: number[] | null;
+  sets_breakdown: number[] | null;
 }
 
 interface LogUpdate {
   count?: number;
-  sets_breakdown_json?: number[] | null;
+  sets_breakdown?: number[] | null;
 }
 
 interface SetEntry {
@@ -114,7 +114,7 @@ export function History() {
       setCount(existingLog.count.toString());
 
       // Safely handle potentially missing or malformed JSON data
-      const breakdownData = existingLog.sets_breakdown_json;
+      const breakdownData = existingLog.sets_breakdown;
 
       if (breakdownData) {
         try {
@@ -218,7 +218,7 @@ export function History() {
         // We use our strict LogUpdate interface here
         const updateData: LogUpdate = {
           count: total,
-          sets_breakdown_json: setsBreakdown
+          sets_breakdown: setsBreakdown
         };
         
         const { error } = await getLogsTable()
@@ -240,7 +240,7 @@ export function History() {
           user_id: profile.id,
           date: dateStr,
           count: total,
-          sets_breakdown_json: setsBreakdown,
+          sets_breakdown: setsBreakdown,
         };
         
         // We cast the response to PostgrestSingleResponse<Log> to ensure data is typed correctly
@@ -252,7 +252,7 @@ export function History() {
         if (error) throw error;
         
         if (data) {
-          const newLog: Log = { ...data, sets_breakdown_json: setsBreakdown };
+          const newLog: Log = { ...data, sets_breakdown: setsBreakdown };
           setLogs([newLog, ...logs].sort((a, b) => b.date.localeCompare(a.date)));
         }
       }
@@ -387,7 +387,7 @@ export function History() {
             {getDaysInMonth().reverse().map((date) => {
               const log = getLogForDate(date);
               const isCurrent = isToday(date);
-              const setsInfo = formatSetsBreakdown(log?.sets_breakdown_json);
+              const setsInfo = formatSetsBreakdown(log?.sets_breakdown);
 
               return (
                 <motion.div
