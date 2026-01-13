@@ -131,7 +131,7 @@ export function Logger() {
             {profile.avatar_url || "💪"}
           </motion.div>
           <h2 className="text-2xl font-bold">{profile.username}</h2>
-          <div className="text-sm text-muted-foreground">Today's Progress</div>
+          <div className="text-sm text-muted-foreground">Today&apos;s Progress</div>
         </div>
 
         {/* Circular Progress */}

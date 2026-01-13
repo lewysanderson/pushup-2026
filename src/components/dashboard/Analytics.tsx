@@ -73,7 +73,7 @@ export function Analytics() {
                 maxSet = maxInThisLog;
               }
             }
-          } catch (e) {
+          } catch {
             // Ignore parse errors
           }
         }

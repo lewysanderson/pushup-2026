@@ -126,7 +126,7 @@ export function JoinGroup({ onBack, onSuccess }: JoinGroupProps) {
           className="text-center space-y-2"
         >
           <p className="text-sm text-muted-foreground">
-            Don't have a code?
+            Don&apos;t have a code?
           </p>
           <Button
             variant="link"

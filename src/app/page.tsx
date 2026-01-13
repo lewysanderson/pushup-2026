@@ -36,7 +36,7 @@ function AppContent() {
     setStep("profile-setup");
   };
 
-  const handleJoinGroupSuccess = async (groupId: string, groupName: string) => {
+  const handleJoinGroupSuccess = async (groupId: string) => {
     // Fetch and set group
     const { data } = await supabase
       .from('groups')

@@ -270,7 +270,7 @@ export function History() {
     return next <= new Date();
   };
 
-  const formatSetsBreakdown = (setsBreakdown: any) => {
+  const formatSetsBreakdown = (setsBreakdown: unknown) => {
     if (!setsBreakdown) return null;
 
     try {
@@ -415,7 +415,7 @@ export function History() {
                   autoFocus
                 />
                 <p className="text-xs text-muted-foreground text-center">
-                  Total for this day. Use "Track Individual Sets" for detailed breakdown.
+                  Total for this day. Use &quot;Track Individual Sets&quot; for detailed breakdown.
                 </p>
               </div>
             ) : (

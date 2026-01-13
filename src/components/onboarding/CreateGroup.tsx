@@ -82,7 +82,7 @@ export function CreateGroup({ onBack, onSuccess }: CreateGroupProps) {
           <CardHeader>
             <CardTitle className="text-2xl">Create Your Group</CardTitle>
             <CardDescription>
-              Set a group name and optional 2026 target. You'll get a unique code to share.
+              Set a group name and optional 2026 target. You&apos;ll get a unique code to share.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

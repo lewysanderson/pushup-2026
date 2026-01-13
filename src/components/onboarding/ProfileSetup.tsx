@@ -129,7 +129,7 @@ export function ProfileSetup({ groupId, groupCode, onComplete }: ProfileSetupPro
                 disabled={isLoading}
               />
               <p className="text-xs text-muted-foreground">
-                💡 Remember this! You'll use your name + group code to log back in.
+                💡 Remember this! You&apos;ll use your name + group code to log back in.
               </p>
             </div>
 

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@/lib/context/UserContext";
 import { supabase } from "@/lib/supabase";
-import { Copy, Check, User, Target, Users, Code } from "lucide-react";
+import { Copy, Check, Target, Users, Code } from "lucide-react";
 
 export function Settings() {
   const { profile, group, setProfile, logout } = useUser();
