@@ -172,10 +172,12 @@ export function History() {
         setLogs(logs.filter(log => log.id !== editingLog.id));
       } else if (editingLog) {
         // Update existing
+        // FIXED: Used actual variables 'total' and 'setsBreakdown'
         const updateData = {
-          count: yourCountVariable,
-          sets_breakdown_json: yourSetsVariable // Change 'sets_breakdown' to 'sets_breakdown_json'
+          count: total,
+          sets_breakdown_json: setsBreakdown 
         };
+        
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         const { error } = await supabase
@@ -187,7 +189,7 @@ export function History() {
         setLogs(logs.map(log => log.id === editingLog.id ? {
           ...log,
           count: total,
-          sets_breakdown: setsBreakdown
+          sets_breakdown: setsBreakdown // Keep local state consistent
         } : log));
       } else {
         // Insert new
@@ -195,8 +197,10 @@ export function History() {
           user_id: profile.id,
           date: dateStr,
           count: total,
-          sets_breakdown: setsBreakdown,
+          // FIXED: Changed to sets_breakdown_json to match the database column
+          sets_breakdown_json: setsBreakdown, 
         };
+        
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         const { data, error } = await supabase
@@ -206,7 +210,9 @@ export function History() {
           .single();
 
         if (error) throw error;
-        setLogs([data, ...logs].sort((a, b) => b.date.localeCompare(a.date)));
+        // Fix the local state object to match what UI expects (sets_breakdown)
+        const newLog = { ...data, sets_breakdown: setsBreakdown };
+        setLogs([newLog, ...logs].sort((a, b) => b.date.localeCompare(a.date)));
       }
 
       setIsModalOpen(false);
