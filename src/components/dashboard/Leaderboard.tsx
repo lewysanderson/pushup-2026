@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -18,35 +18,7 @@ export function Leaderboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("total");
 
-  useEffect(() => {
-    if (profile && group) {
-      loadLeaderboard();
-      loadGroupStats();
-
-      // Subscribe to realtime updates
-      const channel = supabase
-        .channel('leaderboard-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'logs',
-          },
-          () => {
-            loadLeaderboard();
-            loadGroupStats();
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [profile, group]);
-
-  const loadLeaderboard = async () => {
+  const loadLeaderboard = useCallback(async () => {
     if (!group) return;
 
     try {
@@ -98,9 +70,9 @@ export function Leaderboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [group]);
 
-  const loadGroupStats = async () => {
+  const loadGroupStats = useCallback(async () => {
     if (!group) return;
 
     try {
@@ -130,7 +102,35 @@ export function Leaderboard() {
     } catch (error) {
       console.error('Error loading group stats:', error);
     }
-  };
+  }, [group]);
+
+  useEffect(() => {
+    if (profile && group) {
+      loadLeaderboard();
+      loadGroupStats();
+
+      // Subscribe to realtime updates
+      const channel = supabase
+        .channel('leaderboard-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'logs',
+          },
+          () => {
+            loadLeaderboard();
+            loadGroupStats();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [profile, group, loadLeaderboard, loadGroupStats]);
 
   const getSortedLeaderboard = () => {
     if (activeTab === "total") {

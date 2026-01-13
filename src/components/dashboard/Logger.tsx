@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,14 +20,7 @@ export function Logger() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
-  useEffect(() => {
-    if (profile) {
-      loadTodayData();
-      loadStreak();
-    }
-  }, [profile]);
-
-  const loadTodayData = async () => {
+  const loadTodayData = useCallback(async () => {
     if (!profile) return;
 
     try {
@@ -45,9 +38,9 @@ export function Logger() {
     } finally {
       setIsLoadingData(false);
     }
-  };
+  }, [profile]);
 
-  const loadStreak = async () => {
+  const loadStreak = useCallback(async () => {
     if (!profile) return;
 
     try {
@@ -63,7 +56,14 @@ export function Logger() {
     } catch (error) {
       console.error('Error loading streak:', error);
     }
-  };
+  }, [profile]);
+
+  useEffect(() => {
+    if (profile) {
+      loadTodayData();
+      loadStreak();
+    }
+  }, [profile, loadTodayData, loadStreak]);
 
   const handleLogPushups = async (count: number, setsBreakdown?: SetBreakdown) => {
     if (!profile) return;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,9 +41,9 @@ export function History() {
     if (profile) {
       loadMonthLogs();
     }
-  }, [profile, currentMonth]);
+  }, [profile, currentMonth]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadMonthLogs = async () => {
+  const loadMonthLogs = useCallback(async () => {
     if (!profile) return;
 
     setIsLoading(true);
@@ -66,7 +66,13 @@ export function History() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [profile, currentMonth]);
+
+  useEffect(() => {
+    if (profile) {
+      loadMonthLogs();
+    }
+  }, [profile, loadMonthLogs]);
 
   const handleDateClick = (date: Date) => {
     setSelectedDate(date);
@@ -172,7 +178,7 @@ export function History() {
         setLogs(logs.filter(log => log.id !== editingLog.id));
       } else if (editingLog) {
         // Update existing
-        const updateData: Record<string, unknown> = {
+        const updateData = {
           count: total,
           sets_breakdown: setsBreakdown
         };
@@ -189,7 +195,7 @@ export function History() {
         } : log));
       } else {
         // Insert new
-        const insertData: Record<string, unknown> = {
+        const insertData = {
           user_id: profile.id,
           date: dateStr,
           count: total,

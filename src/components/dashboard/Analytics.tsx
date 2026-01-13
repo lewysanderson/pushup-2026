@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -31,9 +31,9 @@ export function Analytics() {
     if (profile) {
       loadAnalytics();
     }
-  }, [profile]);
+  }, [profile]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
     if (!profile) return;
 
     try {
@@ -99,7 +99,13 @@ export function Analytics() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [profile]);
+
+  useEffect(() => {
+    if (profile) {
+      loadAnalytics();
+    }
+  }, [profile, loadAnalytics]);
 
   const calculateProjection = () => {
     if (!profile || stats.daysLogged === 0) return 0;
