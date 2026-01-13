@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -18,7 +17,32 @@ import { supabase } from "@/lib/supabase";
 import { useUser } from "@/lib/context/UserContext";
 import { formatNumber } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday } from "date-fns";
-import type { Log } from "@/types";
+import type { PostgrestSingleResponse } from "@supabase/supabase-js";
+
+// --- STRICT TYPE DEFINITIONS ---
+// We define these locally to ensure type safety even if the global 
+// database.types.ts is out of sync or missing the table definition.
+
+interface Log {
+  id: string;
+  user_id: string;
+  date: string;
+  count: number;
+  sets_breakdown_json: number[] | null;
+  created_at?: string;
+}
+
+interface LogInsert {
+  user_id: string;
+  date: string;
+  count: number;
+  sets_breakdown_json: number[] | null;
+}
+
+interface LogUpdate {
+  count?: number;
+  sets_breakdown_json?: number[] | null;
+}
 
 interface SetEntry {
   id: string;
@@ -38,6 +62,15 @@ export function History() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [sets, setSets] = useState<SetEntry[]>([{ id: '1', reps: '' }]);
 
+  // --- SAFE SUPABASE REFERENCE ---
+  // This helper function isolates the type assertion. 
+  // It tells TypeScript: "Treat 'logs' as a table that returns <Log> items."
+  // This allows us to use .update() and .insert() safely in the rest of the component.
+  const getLogsTable = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return supabase.from('logs') as any;
+  };
+
   const loadMonthLogs = useCallback(async () => {
     if (!profile) return;
 
@@ -46,8 +79,9 @@ export function History() {
       const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
       const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
 
-      const { data, error } = await supabase
-        .from('logs')
+      // We use our helper here. The response will be untyped initially, 
+      // so we cast the result data to Log[] strictly.
+      const { data, error } = await getLogsTable()
         .select('*')
         .eq('user_id', profile.id)
         .gte('date', start)
@@ -55,7 +89,9 @@ export function History() {
         .order('date', { ascending: false });
 
       if (error) throw error;
-      setLogs(data || []);
+      
+      // Strict cast ensuring our state is always valid
+      setLogs((data as Log[]) || []);
     } catch (error) {
       console.error('Error loading logs:', error);
     } finally {
@@ -77,14 +113,18 @@ export function History() {
       setEditingLog(existingLog);
       setCount(existingLog.count.toString());
 
-      // Parse existing sets breakdown if available
-      const breakdownData = (existingLog as any).sets_breakdown_json || existingLog.sets_breakdown;
+      // Safely handle potentially missing or malformed JSON data
+      const breakdownData = existingLog.sets_breakdown_json;
 
       if (breakdownData) {
         try {
-          const breakdown = typeof breakdownData === 'string'
-            ? JSON.parse(breakdownData)
-            : breakdownData;
+          // If it's already an array (which it should be per our type), use it.
+          // If it came back as a string (edge case), parse it.
+          const breakdown = Array.isArray(breakdownData) 
+            ? breakdownData 
+            : typeof breakdownData === 'string' 
+              ? JSON.parse(breakdownData) 
+              : null;
 
           if (Array.isArray(breakdown) && breakdown.length > 0) {
             setSets(breakdown.map((reps: number, idx: number) => ({
@@ -93,24 +133,25 @@ export function History() {
             })));
             setShowAdvanced(true);
           } else {
-            setSets([{ id: '1', reps: '' }]);
-            setShowAdvanced(false);
+            resetSets();
           }
         } catch {
-          setSets([{ id: '1', reps: '' }]);
-          setShowAdvanced(false);
+          resetSets();
         }
       } else {
-        setSets([{ id: '1', reps: '' }]);
-        setShowAdvanced(false);
+        resetSets();
       }
     } else {
       setEditingLog(null);
       setCount("");
-      setSets([{ id: '1', reps: '' }]);
-      setShowAdvanced(false);
+      resetSets();
     }
     setIsModalOpen(true);
+  };
+
+  const resetSets = () => {
+    setSets([{ id: '1', reps: '' }]);
+    setShowAdvanced(false);
   };
 
   const addSet = () => {
@@ -164,56 +205,61 @@ export function History() {
       }
 
       if (total === 0 && editingLog) {
-        // Delete if count is 0
-        const { error } = await supabase
-          .from('logs')
+        // DELETE
+        const { error } = await getLogsTable()
           .delete()
           .eq('id', editingLog.id);
 
         if (error) throw error;
         setLogs(logs.filter(log => log.id !== editingLog.id));
+
       } else if (editingLog) {
-        // Update existing
-        const updateData = {
+        // UPDATE
+        // We use our strict LogUpdate interface here
+        const updateData: LogUpdate = {
           count: total,
           sets_breakdown_json: setsBreakdown
         };
         
-        // NUCLEAR OPTION: Cast the table ref to any to bypass strict type checks
-        const { error } = await (supabase.from('logs') as any)
+        const { error } = await getLogsTable()
           .update(updateData)
           .eq('id', editingLog.id);
 
         if (error) throw error;
+
+        // Optimistic UI Update
         setLogs(logs.map(log => log.id === editingLog.id ? {
           ...log,
-          count: total,
-          sets_breakdown: setsBreakdown
+          ...updateData
         } : log));
+
       } else {
-        // Insert new
-        const insertData = {
+        // INSERT
+        // We use our strict LogInsert interface here
+        const insertData: LogInsert = {
           user_id: profile.id,
           date: dateStr,
           count: total,
           sets_breakdown_json: setsBreakdown,
         };
         
-        // NUCLEAR OPTION: Cast the table ref to any to bypass strict type checks
-        const { data, error } = await (supabase.from('logs') as any)
+        // We cast the response to PostgrestSingleResponse<Log> to ensure data is typed correctly
+        const { data, error } = await getLogsTable()
           .insert(insertData)
           .select()
-          .single();
+          .single() as PostgrestSingleResponse<Log>;
 
         if (error) throw error;
-        const newLog = { ...data, sets_breakdown: setsBreakdown };
-        setLogs([newLog, ...logs].sort((a, b) => b.date.localeCompare(a.date)));
+        
+        if (data) {
+          const newLog: Log = { ...data, sets_breakdown_json: setsBreakdown };
+          setLogs([newLog, ...logs].sort((a, b) => b.date.localeCompare(a.date)));
+        }
       }
 
       setIsModalOpen(false);
       setCount("");
-      setSets([{ id: '1', reps: '' }]);
-      setShowAdvanced(false);
+      resetSets();
       setEditingLog(null);
       setSelectedDate(null);
     } catch (error) {
@@ -229,8 +275,7 @@ export function History() {
 
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from('logs')
+      const { error } = await getLogsTable()
         .delete()
         .eq('id', editingLog.id);
 
@@ -240,8 +285,7 @@ export function History() {
       setIsModalOpen(false);
       setEditingLog(null);
       setCount("");
-      setSets([{ id: '1', reps: '' }]);
-      setShowAdvanced(false);
+      resetSets();
     } catch (error) {
       console.error('Error deleting log:', error);
       alert("Failed to delete. Please try again.");
@@ -277,13 +321,16 @@ export function History() {
     return next <= new Date();
   };
 
-  const formatSetsBreakdown = (setsBreakdown: unknown) => {
+  const formatSetsBreakdown = (setsBreakdown: number[] | null | unknown) => {
     if (!setsBreakdown) return null;
 
     try {
-      const breakdown = typeof setsBreakdown === 'string'
-        ? JSON.parse(setsBreakdown)
-        : setsBreakdown;
+      // Normalize data
+      const breakdown = Array.isArray(setsBreakdown)
+        ? setsBreakdown
+        : typeof setsBreakdown === 'string'
+          ? JSON.parse(setsBreakdown)
+          : null;
 
       if (Array.isArray(breakdown) && breakdown.length > 0) {
         return breakdown.map((reps, idx) => `Set ${idx + 1}: ${reps}`).join(', ');
@@ -340,11 +387,7 @@ export function History() {
             {getDaysInMonth().reverse().map((date) => {
               const log = getLogForDate(date);
               const isCurrent = isToday(date);
-              
-              const breakdownSource = log 
-                ? ((log as any).sets_breakdown_json || log.sets_breakdown) 
-                : null;
-              const setsInfo = formatSetsBreakdown(breakdownSource);
+              const setsInfo = formatSetsBreakdown(log?.sets_breakdown_json);
 
               return (
                 <motion.div
