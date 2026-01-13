@@ -184,7 +184,7 @@ export function History() {
         };
         const { error } = await supabase
           .from('logs')
-          .update(updateData)
+          .update(updateData as any)
           .eq('id', editingLog.id);
 
         if (error) throw error;
@@ -203,7 +203,7 @@ export function History() {
         };
         const { data, error } = await supabase
           .from('logs')
-          .insert(insertData)
+          .insert(insertData as any)
           .select()
           .single();
 
