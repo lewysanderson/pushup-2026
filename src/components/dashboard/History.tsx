@@ -173,8 +173,8 @@ export function History() {
       } else if (editingLog) {
         // Update existing
         const updateData = {
-          count: total,
-          sets_breakdown: setsBreakdown
+          count: yourCountVariable,
+          sets_breakdown_json: yourSetsVariable // Change 'sets_breakdown' to 'sets_breakdown_json'
         };
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
