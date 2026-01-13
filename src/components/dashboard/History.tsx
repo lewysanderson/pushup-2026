@@ -184,6 +184,7 @@ export function History() {
         };
         const { error } = await supabase
           .from('logs')
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .update(updateData as any)
           .eq('id', editingLog.id);
 
@@ -203,6 +204,7 @@ export function History() {
         };
         const { data, error } = await supabase
           .from('logs')
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .insert(insertData as any)
           .select()
           .single();
