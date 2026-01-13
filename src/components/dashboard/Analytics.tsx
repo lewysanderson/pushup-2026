@@ -10,8 +10,18 @@ import { useUser } from "@/lib/context/UserContext";
 import { formatNumber } from "@/lib/utils";
 import type { DailyStats, Log } from "@/types";
 
+interface Profile {
+  id: string;
+  username: string;
+  avatar_url: string;
+  daily_target: number;
+  group_id: string;
+}
+
 export function Analytics() {
-  const { profile } = useUser();
+  const { profile, group } = useUser();
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [members, setMembers] = useState<Profile[]>([]);
   const [stats, setStats] = useState<{
     total2026: number;
     maxDay: number;
@@ -27,17 +37,39 @@ export function Analytics() {
   });
   const [isLoading, setIsLoading] = useState(true);
 
+  // Load group members for the selector
+  useEffect(() => {
+    const loadMembers = async () => {
+      if (!group) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('group_id', group.id);
+      
+      if (data) {
+        setMembers(data as Profile[]);
+      }
+    };
+    loadMembers();
+  }, [group]);
+
+  // Set default selected user
+  useEffect(() => {
+    if (profile && !selectedUserId) {
+      setSelectedUserId(profile.id);
+    }
+  }, [profile, selectedUserId]);
+
   const loadAnalytics = useCallback(async () => {
-    if (!profile) return;
+    if (!selectedUserId) return;
 
     try {
-      // Fetch all logs for 2026
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
       const { data: logs, error } = await supabase
         .from('logs')
         .select('date, count, sets_breakdown')
-        .eq('user_id', profile.id)
+        .eq('user_id', selectedUserId)
         .gte('date', '2026-01-01')
         .lte('date', '2026-12-31')
         .order('date', { ascending: true });
@@ -95,13 +127,34 @@ export function Analytics() {
     } finally {
       setIsLoading(false);
     }
-  }, [profile]);
+  }, [selectedUserId]);
 
   useEffect(() => {
-    if (profile) {
+    if (selectedUserId) {
       loadAnalytics();
+
+      // Subscribe to realtime updates for the selected user
+      const channel = supabase
+        .channel(`analytics-${selectedUserId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'logs',
+            filter: `user_id=eq.${selectedUserId}`,
+          },
+          () => {
+            loadAnalytics();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
-  }, [profile, loadAnalytics]);
+  }, [selectedUserId, loadAnalytics]);
 
   const calculateProjection = () => {
     if (!profile || stats.daysLogged === 0) return 0;
@@ -140,9 +193,26 @@ export function Analytics() {
     >
       {/* Header */}
       <div className="text-center space-y-2">
-        <h2 className="text-3xl font-bold">Your Analytics</h2>
+        <h2 className="text-3xl font-bold">Analytics</h2>
         <p className="text-muted-foreground">Track your progress through 2026</p>
       </div>
+
+      {/* Member Selector */}
+      {members.length > 0 && (
+        <div className="flex justify-center">
+          <select 
+            className="bg-secondary text-foreground px-4 py-2 rounded-lg border border-border outline-none focus:ring-2 focus:ring-primary"
+            value={selectedUserId || ''}
+            onChange={(e) => setSelectedUserId(e.target.value)}
+          >
+            {members.map(member => (
+              <option key={member.id} value={member.id}>
+                {member.avatar_url} {member.username} {member.id === profile.id ? '(You)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-4">

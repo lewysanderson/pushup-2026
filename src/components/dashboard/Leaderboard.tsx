@@ -4,9 +4,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Flame, Users } from "lucide-react";
+import { Trophy, Flame, Users, Calendar, TrendingUp } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { supabase } from "@/lib/supabase";
 import { useUser } from "@/lib/context/UserContext";
 import { formatNumber, calculatePercentage } from "@/lib/utils";
@@ -27,6 +29,11 @@ export function Leaderboard() {
   const [groupStats, setGroupStats] = useState<GroupStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("total");
+  const [progressData, setProgressData] = useState<any[]>([]);
+  const [groupProfiles, setGroupProfiles] = useState<Profile[]>([]);
+  const [selectedMember, setSelectedMember] = useState<LeaderboardEntry | null>(null);
+  const [memberHistory, setMemberHistory] = useState<any[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
   const loadLeaderboard = useCallback(async () => {
     if (!group) return;
@@ -46,6 +53,52 @@ export function Leaderboard() {
       if (!profiles || profiles.length === 0) {
         setIsLoading(false);
         return;
+      }
+
+      setGroupProfiles(profiles);
+
+      // --- Prepare Progress Chart Data ---
+      const userIds = profiles.map(p => p.id);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: allLogs } = await (supabase.from('logs') as any)
+        .select('user_id, count, date')
+        .in('user_id', userIds)
+        .gte('date', '2026-01-01')
+        .order('date', { ascending: true });
+
+      if (allLogs) {
+        // Create a map of cumulative totals per user
+        const userTotals: Record<string, number> = {};
+        userIds.forEach(id => userTotals[id] = 0);
+
+        // Get all unique dates
+        const uniqueDates = Array.from(new Set(allLogs.map((l: any) => l.date))).sort() as string[];
+        
+        // Build chart data points
+        const chartData = uniqueDates.map(date => {
+          const dayLogs = allLogs.filter((l: any) => l.date === date);
+          
+          // Update running totals
+          dayLogs.forEach((log: any) => {
+            if (userTotals[log.user_id] !== undefined) {
+              userTotals[log.user_id] += log.count;
+            }
+          });
+
+          // Create data point with current totals for everyone
+          const entry: any = { date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) };
+          profiles.forEach(p => {
+            entry[p.id] = userTotals[p.id];
+          });
+          return entry;
+        });
+
+        // If too many data points, sample them to keep chart readable
+        const sampledData = chartData.length > 30 
+          ? chartData.filter((_, i) => i === 0 || i === chartData.length - 1 || i % Math.ceil(chartData.length / 30) === 0)
+          : chartData;
+          
+        setProgressData(sampledData);
       }
 
       // Get total reps for each user
@@ -147,6 +200,29 @@ export function Leaderboard() {
     }
   }, [profile, group, loadLeaderboard, loadGroupStats]);
 
+  // Load history when a member is selected
+  useEffect(() => {
+    const loadMemberHistory = async () => {
+      if (!selectedMember) return;
+      setIsHistoryLoading(true);
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data } = await (supabase.from('logs') as any)
+          .select('*')
+          .eq('user_id', selectedMember.id)
+          .order('date', { ascending: false })
+          .limit(30);
+        setMemberHistory(data || []);
+      } catch (error) {
+        console.error('Error loading member history:', error);
+      } finally {
+        setIsHistoryLoading(false);
+      }
+    };
+
+    loadMemberHistory();
+  }, [selectedMember]);
+
   const getSortedLeaderboard = () => {
     if (activeTab === "total") {
       return [...leaderboard].sort((a, b) => b.total_reps - a.total_reps);
@@ -161,6 +237,8 @@ export function Leaderboard() {
     return `#${index + 1}`;
   };
 
+  const CHART_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
+
   if (!profile || !group) return null;
 
   if (isLoading) {
@@ -174,9 +252,7 @@ export function Leaderboard() {
   const sortedLeaderboard = getSortedLeaderboard();
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+    <div
       className="p-6 space-y-6 pb-24"
     >
       {/* Header */}
@@ -187,6 +263,49 @@ export function Leaderboard() {
           <span>{groupStats?.member_count || 0} members</span>
         </div>
       </div>
+
+      {/* Group Progress Chart */}
+      {progressData.length > 1 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Card className="glass border-none">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                Race to the Top
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[200px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={progressData}>
+                    <XAxis dataKey="date" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px', color: '#fff' }}
+                      itemStyle={{ color: '#fff' }}
+                    />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                    {groupProfiles.map((p, i) => (
+                      <Line
+                        key={p.id}
+                        type="monotone"
+                        dataKey={p.id}
+                        name={p.username}
+                        stroke={CHART_COLORS[i % CHART_COLORS.length]}
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Group Progress */}
       {groupStats && groupStats.group_target && (
@@ -242,9 +361,10 @@ export function Leaderboard() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.05 }}
+              onClick={() => setSelectedMember(entry)}
             >
               <Card
-                className={`glass border-none ${
+                className={`glass border-none cursor-pointer hover:bg-white/5 transition-colors ${
                   entry.id === profile.id ? 'ring-2 ring-primary' : ''
                 }`}
               >
@@ -279,9 +399,10 @@ export function Leaderboard() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.05 }}
+              onClick={() => setSelectedMember(entry)}
             >
               <Card
-                className={`glass border-none ${
+                className={`glass border-none cursor-pointer hover:bg-white/5 transition-colors ${
                   entry.id === profile.id ? 'ring-2 ring-primary' : ''
                 }`}
               >
@@ -310,6 +431,45 @@ export function Leaderboard() {
           ))}
         </TabsContent>
       </Tabs>
-    </motion.div>
+
+      {/* Member History Modal */}
+      <Dialog open={!!selectedMember} onOpenChange={(open) => !open && setSelectedMember(null)}>
+        <DialogContent className="max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span>{selectedMember?.avatar_url || "💪"}</span>
+              <span>{selectedMember?.username}&apos;s History</span>
+            </DialogTitle>
+            <DialogDescription>
+              Recent activity
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-4">
+            {isHistoryLoading ? (
+              <div className="text-center py-4 text-muted-foreground">Loading history...</div>
+            ) : memberHistory.length > 0 ? (
+              <div className="space-y-2">
+                {memberHistory.map((log) => (
+                  <div key={log.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
+                    <div className="flex items-center gap-3">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">
+                        {new Date(log.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                    <div className="font-bold text-primary">
+                      {formatNumber(log.count)} reps
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-muted-foreground">No logs found for 2026.</div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
