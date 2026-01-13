@@ -11,7 +11,7 @@ import { Trophy, Flame, Users, Calendar, TrendingUp } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { supabase } from "@/lib/supabase";
 import { useUser } from "@/lib/context/UserContext";
-import { formatNumber, calculatePercentage } from "@/lib/utils";
+import { formatNumber, calculatePercentage, getTodayString } from "@/lib/utils";
 import type { LeaderboardEntry, GroupStats } from "@/types";
 
 // Explicitly define what a Profile looks like to prevent "never" errors
@@ -22,6 +22,38 @@ interface Profile {
   daily_target: number;
   group_id: string;
 }
+
+interface StreakLog {
+  count: number;
+  date: string;
+}
+
+const calculateStreak = (logs: StreakLog[], target: number) => {
+  const validDates = new Set(
+    logs
+      .filter((log) => log.count >= target)
+      .map((log) => log.date)
+  );
+
+  let streak = 0;
+  let currentStr = getTodayString();
+
+  // If today is not valid (not entered or target not met), start checking from yesterday
+  if (!validDates.has(currentStr)) {
+    const d = new Date(currentStr);
+    d.setDate(d.getDate() - 1);
+    currentStr = d.toISOString().split('T')[0];
+  }
+
+  while (validDates.has(currentStr)) {
+    streak++;
+    const d = new Date(currentStr);
+    d.setDate(d.getDate() - 1);
+    currentStr = d.toISOString().split('T')[0];
+  }
+
+  return streak;
+};
 
 export function Leaderboard() {
   const { profile, group } = useUser();
@@ -115,18 +147,14 @@ export function Leaderboard() {
           const totalReps = (logs || []).reduce((sum: number, log: any) => sum + (log.count || 0), 0);
 
           // Calculate streak
-          const { data: streakData } = await supabase
-            .rpc('calculate_streak', {
-              user_uuid: p.id,
-              target_reps: p.daily_target,
-            });
+          const streak = calculateStreak(logs || [], p.daily_target);
 
           return {
             id: p.id,
             username: p.username,
             avatar_url: p.avatar_url,
             total_reps: totalReps,
-            streak: streakData || 0,
+            streak,
           };
         })
       );

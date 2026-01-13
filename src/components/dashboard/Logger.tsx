@@ -12,9 +12,43 @@ import { useUser } from "@/lib/context/UserContext";
 import { getTodayString } from "@/lib/utils";
 import type { SetBreakdown } from "@/types";
 
+interface StreakLog {
+  count: number;
+  date: string;
+}
+
+const calculateStreak = (logs: StreakLog[], target: number) => {
+  const validDates = new Set(
+    logs
+      .filter((log) => log.count >= target)
+      .map((log) => log.date)
+  );
+
+  let streak = 0;
+  let currentStr = getTodayString();
+
+  // If today is not valid (not entered or target not met), start checking from yesterday
+  // This prevents the streak from showing as 0 just because today isn't done yet
+  if (!validDates.has(currentStr)) {
+    const d = new Date(currentStr);
+    d.setDate(d.getDate() - 1);
+    currentStr = d.toISOString().split('T')[0];
+  }
+
+  while (validDates.has(currentStr)) {
+    streak++;
+    const d = new Date(currentStr);
+    d.setDate(d.getDate() - 1);
+    currentStr = d.toISOString().split('T')[0];
+  }
+
+  return streak;
+};
+
 export function Logger() {
   const { profile } = useUser();
   const [todayCount, setTodayCount] = useState(0);
+  const [todayBreakdown, setTodayBreakdown] = useState<number[]>([]);
   const [streak, setStreak] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -25,14 +59,25 @@ export function Logger() {
 
     try {
       const today = getTodayString();
-      const { data } = await supabase
-        .from('logs')
-        .select('count')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase.from('logs') as any)
+        .select('count, sets_breakdown')
         .eq('user_id', profile.id)
         .eq('date', today)
         .single();
 
       setTodayCount(data?.count || 0);
+
+      if (data?.sets_breakdown) {
+        const breakdown = Array.isArray(data.sets_breakdown)
+          ? data.sets_breakdown
+          : typeof data.sets_breakdown === 'string'
+            ? JSON.parse(data.sets_breakdown)
+            : [];
+        setTodayBreakdown(breakdown);
+      } else {
+        setTodayBreakdown([]);
+      }
     } catch (error) {
       console.error('Error loading today data:', error);
     } finally {
@@ -44,14 +89,16 @@ export function Logger() {
     if (!profile) return;
 
     try {
-      const { data, error } = await supabase
-        .rpc('calculate_streak', {
-          user_uuid: profile.id,
-          target_reps: profile.daily_target,
-        });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: logs } = await (supabase.from('logs') as any)
+        .select('date, count')
+        .eq('user_id', profile.id)
+        .gte('date', '2026-01-01')
+        .order('date', { ascending: false });
 
-      if (!error && data !== null) {
-        setStreak(data);
+      if (logs) {
+        const currentStreak = calculateStreak(logs, profile.daily_target);
+        setStreak(currentStreak);
       }
     } catch (error) {
       console.error('Error loading streak:', error);
@@ -74,23 +121,27 @@ export function Logger() {
       const today = getTodayString();
       const newTotal = todayCount + count;
 
-      // Convert {sets, reps} to [reps, reps, reps] for consistency with other components
-      // and to satisfy the Json type definition (arrays are valid Json, custom objects need index signature)
-      let setsBreakdownJson: number[] | null = null;
+      let newSets: number[] = [];
       if (setsBreakdown && setsBreakdown.sets > 0) {
-        setsBreakdownJson = Array(setsBreakdown.sets).fill(setsBreakdown.reps);
+        newSets = Array(setsBreakdown.sets).fill(setsBreakdown.reps);
+      } else {
+        // If just total is entered, treat it as a single set
+        newSets = [count];
       }
+
+      const updatedBreakdown = [...todayBreakdown, ...newSets];
 
       // Optimistic update
       setTodayCount(newTotal);
+      setTodayBreakdown(updatedBreakdown);
 
-      const { error } = await supabase
-        .from('logs')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.from('logs') as any)
         .upsert({
           user_id: profile.id,
           date: today,
           count: newTotal,
-          sets_breakdown: setsBreakdownJson,
+          sets_breakdown: updatedBreakdown,
         }, {
           onConflict: 'user_id,date',
         });
@@ -107,6 +158,7 @@ export function Logger() {
       console.error('Error logging pushups:', error);
       // Revert optimistic update
       setTodayCount(todayCount);
+      setTodayBreakdown(todayBreakdown);
     } finally {
       setIsLoading(false);
     }
